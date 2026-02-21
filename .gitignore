@@ -12,6 +12,7 @@ build/
 develop-eggs/
 dist/
 downloads/
+credentials.json
 eggs/
 .eggs/
 lib/
