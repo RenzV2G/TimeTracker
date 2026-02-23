@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import ttk, messagebox
 import datetime
 import threading
 import time
@@ -20,258 +20,549 @@ SCOPES = [
 
 IDLE_THRESHOLD = 360
 
-# GLOBALS
-sheet = None
-creds = None
-last_activity = datetime.datetime.now()
-is_clocked_in = False
-current_row = None
-current_activity = "Active"
-active_start_time = None
-total_active_seconds = 0
 
-# ================= OAUTH =================
-
-def authenticate():
-    global creds
-
-    if os.path.exists("token.json"):
-        creds = Credentials.from_authorized_user_file("token.json", SCOPES)
-
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                "client_secret.json", SCOPES
-            )
-            creds = flow.run_local_server(port=0)
-
-        with open("token.json", "w") as token:
-            token.write(creds.to_json())
-
-    return gspread.authorize(creds)
-
-# ================= UTIL =================
-
-def extract_sheet_id(url):
-    match = re.search(r"/d/([a-zA-Z0-9-_]+)", url)
-    return match.group(1) if match else None
-
-def save_config(data):
-    with open("config.json", "w") as f:
-        json.dump(data, f)
+# ================= CONFIG =================
 
 def load_config():
     if os.path.exists("config.json"):
         with open("config.json", "r") as f:
             return json.load(f)
-    return {}
+    return {"clients": {}}
 
-# ================= IDLE MONITOR =================
 
-def on_move(x, y):
-    global last_activity
-    last_activity = datetime.datetime.now()
+def save_config(data):
+    with open("config.json", "w") as f:
+        json.dump(data, f, indent=4)
 
-mouse.Listener(on_move=on_move).start()
 
-def monitor_idle():
-    global current_activity, total_active_seconds, active_start_time
+def extract_sheet_id(url):
+    match = re.search(r"/d/([a-zA-Z0-9-_]+)", url)
+    return match.group(1) if match else None
 
-    while is_clocked_in:
-        idle_time = (datetime.datetime.now() - last_activity).seconds
 
-        if idle_time >= IDLE_THRESHOLD:
-            if current_activity == "Active":
-                total_active_seconds += (
-                    datetime.datetime.now() - active_start_time
-                ).seconds
-                sheet.update(f"F{current_row}", "Idle")
-                current_activity = "Idle"
-                status_label.config(text="Status: Idle")
-        else:
-            if current_activity == "Idle":
-                active_start_time = datetime.datetime.now()
-                sheet.update(f"F{current_row}", "Active")
-                current_activity = "Active"
-                status_label.config(text="Status: Active")
+# ================= MAIN APP =================
 
-        time.sleep(5)
-
-# ================= APP =================
-
-class App(tk.Tk):
+class TimeTrackerApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Freelance Time Tracker")
-        self.geometry("400x300")
 
-        container = tk.Frame(self)
-        container.pack(fill="both", expand=True)
+        self.title("Freelance Time Tracker")
+        self.geometry("560x520")
+        self.resizable(False, False)
+
+        self.style = ttk.Style(self)
+        self.style.theme_use("clam")
+
+        self.configure(bg="#f4f6f9")
+        self.style.configure("TFrame", background="#f4f6f9")
+        self.style.configure("TLabel", background="#f4f6f9", font=("Segoe UI", 10))
+        self.style.configure("Header.TLabel", font=("Segoe UI", 18, "bold"))
+        self.style.configure("Primary.TButton",
+                     font=("Segoe UI", 10, "bold"),
+                     padding=6)
+        self.style.configure("Treeview",
+                     font=("Segoe UI", 10),
+                     rowheight=28)
+        self.style.configure("Treeview.Heading",
+                     font=("Segoe UI", 10, "bold"))
+
+        self.config_data = load_config()
+
+        self.sheet = None
+        self.current_client = None
+        self.is_clocked_in = False
+        self.current_row = None
+        self.active_start = None
+        self.total_active = 0
+        self.last_activity = datetime.datetime.now()
+        self.current_activity = "Active"
+
+        container = ttk.Frame(self)
+        container.pack(fill="both", expand=True, padx=30, pady=20)
 
         self.frames = {}
 
-        for F in (SignInFrame, SheetFrame, UserFrame, DashboardFrame):
+        for F in (SignInFrame, NameFrame, SheetFrame, DashboardFrame):
             frame = F(container, self)
             self.frames[F] = frame
             frame.grid(row=0, column=0, sticky="nsew")
 
-        self.show_frame(SignInFrame)
+        self.auto_navigate()
+        mouse.Listener(on_move=self.on_move).start()
 
-    def show_frame(self, cont):
-        frame = self.frames[cont]
+    # ---------- AUTH ----------
+
+    def is_logged_in(self):
+        return os.path.exists("token.json")
+
+    def authenticate(self):
+        creds = None
+
+        if os.path.exists("token.json"):
+            creds = Credentials.from_authorized_user_file("token.json", SCOPES)
+
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    "client_secret.json", SCOPES
+                )
+                creds = flow.run_local_server(port=0)
+
+            with open("token.json", "w") as token:
+                token.write(creds.to_json())
+
+        return gspread.authorize(creds)
+
+    def sign_out(self):
+        if os.path.exists("token.json"):
+            os.remove("token.json")
+        self.config_data = load_config()
+        self.auto_navigate()
+
+    # ---------- NAVIGATION ----------
+
+    def auto_navigate(self):
+        if not self.is_logged_in():
+            self.show_frame(SignInFrame)
+        elif not self.config_data.get("name"):
+            self.show_frame(NameFrame)
+        else:
+            self.show_frame(DashboardFrame)
+
+    def show_frame(self, frame_class):
+        frame = self.frames[frame_class]
         frame.tkraise()
+        if hasattr(frame, "refresh"):
+            frame.refresh()
 
-# ================= STEP 1 =================
+    # ---------- IDLE ----------
 
-class SignInFrame(tk.Frame):
-    def __init__(self, parent, controller):
+    def on_move(self, x, y):
+        self.last_activity = datetime.datetime.now()
+
+    def monitor_idle(self):
+        while self.is_clocked_in:
+            idle_time = (datetime.datetime.now() - self.last_activity).seconds
+
+            if idle_time >= IDLE_THRESHOLD:
+                if self.current_activity == "Active":
+                    self.total_active += (
+                        datetime.datetime.now() - self.active_start
+                    ).seconds
+                    self.sheet.update(f"F{self.current_row}", "Idle")
+                    self.current_activity = "Idle"
+            else:
+                if self.current_activity == "Idle":
+                    self.active_start = datetime.datetime.now()
+                    self.sheet.update(f"F{self.current_row}", "Active")
+                    self.current_activity = "Active"
+
+            time.sleep(5)
+    
+    def get_first_empty_row(self):
+        data = self.sheet.get_all_values()
+
+        for i, row in enumerate(data, start=1):
+            if not any(cell.strip() for cell in row):
+                return i
+
+        return len(data) + 1
+
+
+# ================= SIGN IN =================
+
+class SignInFrame(ttk.Frame):
+    def __init__(self, parent, app):
         super().__init__(parent)
 
-        tk.Label(self, text="Step 1: Sign in to Google", font=("Arial", 14)).pack(pady=20)
+        ttk.Label(self, text="Sign in to Google", font=("Segoe UI", 18)).pack(pady=80)
+        ttk.Button(self, text="Sign In", command=lambda: self.login(app)).pack()
 
-        tk.Button(self, text="Sign In with Google", width=25,
-                  command=lambda: self.signin(controller)).pack()
-
-    def signin(self, controller):
+    def login(self, app):
         try:
-            authenticate()
-            messagebox.showinfo("Success", "Signed in successfully!")
-            controller.show_frame(SheetFrame)
+            app.authenticate()
+            app.auto_navigate()
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
-# ================= STEP 2 =================
 
-class SheetFrame(tk.Frame):
-    def __init__(self, parent, controller):
+# ================= NAME =================
+
+class NameFrame(ttk.Frame):
+    def __init__(self, parent, app):
         super().__init__(parent)
 
-        tk.Label(self, text="Step 2: Connect Sheet", font=("Arial", 14)).pack(pady=10)
+        ttk.Label(self, text="Enter Your Name", font=("Segoe UI", 18)).pack(pady=80)
 
-        self.sheet_entry = tk.Entry(self, width=40)
-        self.sheet_entry.pack(pady=5)
-        self.sheet_entry.insert(0, "Paste Google Sheet Link")
+        self.entry = ttk.Entry(self, width=30)
+        self.entry.pack()
 
-        self.client_entry = tk.Entry(self, width=40)
-        self.client_entry.pack(pady=5)
-        self.client_entry.insert(0, "Client Name")
+        ttk.Button(self, text="Save", command=lambda: self.save(app)).pack(pady=20)
 
-        tk.Button(self, text="Connect",
-                  command=lambda: self.connect(controller)).pack(pady=10)
+    def refresh(self):
+        self.entry.delete(0, tk.END)
+        self.entry.insert(0, load_config().get("name", ""))
 
-    def connect(self, controller):
-        global sheet
+    def save(self, app):
+        app.config_data["name"] = self.entry.get()
+        save_config(app.config_data)
+        app.auto_navigate()
 
-        try:
-            client = authenticate()
-            sheet_id = extract_sheet_id(self.sheet_entry.get())
-            sheet = client.open_by_key(sheet_id).sheet1
 
+# ================= SHEETS =================
+
+class SheetFrame(ttk.Frame):
+    def __init__(self, parent, app):
+        super().__init__(parent)
+        self.app = app
+
+        ttk.Label(self,
+                  text="Manage Client Sheets",
+                  style="Header.TLabel").pack(pady=15)
+
+        table_frame = ttk.Frame(self)
+        table_frame.pack(pady=10)
+
+        self.tree = ttk.Treeview(
+            table_frame,
+            columns=("Client", "SheetID"),
+            show="headings",
+            height=8
+        )
+
+        self.tree.heading("Client", text="Client")
+        self.tree.heading("SheetID", text="Sheet ID")
+
+        self.tree.column("Client", width=180, anchor="center")
+        self.tree.column("SheetID", width=260, anchor="center")
+
+        self.tree.pack()
+
+        action_frame = ttk.Frame(self)
+        action_frame.pack(pady=10)
+
+        self.edit_btn = ttk.Button(
+            action_frame,
+            text="✏ Edit",
+            command=self.edit_selected,
+            style="Primary.TButton"
+        )
+        self.edit_btn.pack(side="left", padx=10)
+
+        self.delete_btn = ttk.Button(
+            action_frame,
+            text="🗑 Delete",
+            command=self.delete_selected,
+            style="Primary.TButton"
+        )
+        self.delete_btn.pack(side="left", padx=10)
+
+        ttk.Button(self,
+                   text="Add New Client",
+                   command=self.add_popup,
+                   style="Primary.TButton").pack(pady=5)
+
+        ttk.Button(self,
+                   text="Back to Dashboard",
+                   command=lambda: app.show_frame(DashboardFrame)).pack(pady=5)
+
+    def refresh(self):
+        self.tree.delete(*self.tree.get_children())
+
+        config = load_config()
+        for name, data in config.get("clients", {}).items():
+            self.tree.insert(
+                "",
+                "end",
+                values=(name, data["sheet_id"])
+            )
+
+    def get_selected_client(self):
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showwarning("Select Client", "Please select a client.")
+            return None
+        return self.tree.item(selected[0])["values"][0]
+
+    def edit_selected(self):
+        client = self.get_selected_client()
+        if client:
+            self.edit_popup(client)
+
+    def delete_selected(self):
+        client = self.get_selected_client()
+        if not client:
+            return
+
+        confirm = messagebox.askyesno(
+            "Confirm Delete",
+            f"Delete '{client}'?"
+        )
+        if confirm:
             config = load_config()
-            config["client"] = self.client_entry.get()
-            config["sheet_url"] = self.sheet_entry.get()
+            del config["clients"][client]
             save_config(config)
+            self.refresh()
 
-            messagebox.showinfo("Success", "Sheet Connected!")
-            controller.show_frame(UserFrame)
+    def add_popup(self):
+        self.edit_popup()
 
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
+    def edit_popup(self, client_name=None):
+        popup = tk.Toplevel(self)
+        popup.title("Client Setup")
+        popup.geometry("400x250")
+        popup.configure(bg="#f4f6f9")
 
-# ================= STEP 3 =================
+        ttk.Label(popup, text="Client Name").pack(pady=5)
+        name_entry = ttk.Entry(popup, width=40)
+        name_entry.pack()
 
-class UserFrame(tk.Frame):
-    def __init__(self, parent, controller):
-        super().__init__(parent)
+        ttk.Label(popup, text="Google Sheet URL").pack(pady=5)
+        url_entry = ttk.Entry(popup, width=40)
+        url_entry.pack()
 
-        tk.Label(self, text="Step 3: Your Name", font=("Arial", 14)).pack(pady=20)
+        if client_name:
+            config = load_config()
+            data = config["clients"][client_name]
+            name_entry.insert(0, client_name)
+            url_entry.insert(0, data["sheet_url"])
 
-        self.name_entry = tk.Entry(self, width=30)
-        self.name_entry.pack()
+        def save():
+            try:
+                sheet_id = extract_sheet_id(url_entry.get())
+                if not sheet_id:
+                    raise Exception("Invalid Google Sheets URL.")
 
-        config = load_config()
-        if "name" in config:
-            self.name_entry.insert(0, config["name"])
+                client = self.app.authenticate()
+                sheet = client.open_by_key(sheet_id).sheet1
+                _ = sheet.row_count
 
-        tk.Button(self, text="Continue",
-                  command=lambda: self.save_and_continue(controller)).pack(pady=15)
+                config = load_config()
+                config["clients"][name_entry.get()] = {
+                    "sheet_url": url_entry.get(),
+                    "sheet_id": sheet_id
+                }
 
-    def save_and_continue(self, controller):
-        config = load_config()
-        config["name"] = self.name_entry.get()
-        save_config(config)
-        controller.show_frame(DashboardFrame)
+                if client_name and client_name != name_entry.get():
+                    del config["clients"][client_name]
+
+                save_config(config)
+                popup.destroy()
+                self.refresh()
+
+            except Exception as e:
+                messagebox.showerror("Connection Error", str(e))
+
+        ttk.Button(popup,
+                   text="Save",
+                   command=save,
+                   style="Primary.TButton").pack(pady=15)
+
 
 # ================= DASHBOARD =================
 
-class DashboardFrame(tk.Frame):
-    def __init__(self, parent, controller):
+class DashboardFrame(ttk.Frame):
+    def __init__(self, parent, app):
         super().__init__(parent)
+        self.app = app
 
-        tk.Label(self, text="Dashboard", font=("Arial", 14)).pack(pady=10)
+        header = ttk.Frame(self)
+        header.pack(fill="x")
 
-        tk.Button(self, text="Clock In", command=self.clock_in).pack(pady=5)
-        tk.Button(self, text="Clock Out", command=self.clock_out).pack(pady=5)
+        ttk.Label(header,
+                  text="Dashboard",
+                  style="Header.TLabel").pack(side="left")
 
-        global status_label
-        status_label = tk.Label(self, text="Status: Not Clocked In")
-        status_label.pack(pady=10)
+        settings_btn = ttk.Menubutton(header, text="⚙")
+        menu = tk.Menu(settings_btn, tearoff=0)
+        menu.add_command(label="Edit Name",
+                         command=lambda: app.show_frame(NameFrame))
+        menu.add_command(label="Sign Out", command=app.sign_out)
+        settings_btn["menu"] = menu
+        settings_btn.pack(side="right")
 
-    def clock_in(self):
-        global is_clocked_in, current_row
-        global active_start_time, total_active_seconds
+        ttk.Separator(self).pack(fill="x", pady=10)
+
+        self.greeting = ttk.Label(self, font=("Segoe UI", 13))
+        self.greeting.pack(pady=5)
+
+        row = ttk.Frame(self)
+        row.pack()
+
+        self.client_var = tk.StringVar()
+
+        self.client_dropdown = ttk.Combobox(
+            row,
+            textvariable=self.client_var,
+            state="readonly",
+            width=28
+        )
+        self.client_dropdown.pack(side="left")
+
+        self.client_dropdown.bind("<<ComboboxSelected>>", self.load_client)
+
+        self.status_icon = tk.Label(row, text="⚪", font=("Segoe UI", 14),
+                                    bg="#f4f6f9")
+        self.status_icon.pack(side="left", padx=5)
+
+        ttk.Button(self,
+                   text="Sheets",
+                   command=lambda: app.show_frame(SheetFrame),
+                   style="Primary.TButton").pack(pady=5)
+
+        ttk.Separator(self).pack(fill="x", pady=10)
+
+        self.status_label = ttk.Label(self, text="Not Clocked In")
+        self.status_label.pack()
+
+        self.timestamp_label = ttk.Label(self, text="Last Action: --")
+        self.timestamp_label.pack()
+
+        self.total_label = ttk.Label(self,
+                                     text="00:00:00",
+                                     font=("Segoe UI", 22, "bold"))
+        self.total_label.pack(pady=15)
+
+        self.clock_in_btn = ttk.Button(self,
+                                       text="Clock In",
+                                       command=self.clock_in,
+                                       style="Primary.TButton")
+
+        self.clock_out_btn = ttk.Button(self,
+                                        text="Clock Out",
+                                        command=self.clock_out,
+                                        style="Primary.TButton")
+
+        self.clock_in_btn.pack(pady=10)
+
+    def refresh(self):
+        config = load_config()
+        self.greeting.config(text=f"Hello, {config.get('name','')} 👋")
+
+        clients = list(config.get("clients", {}).keys())
+        self.client_dropdown["values"] = clients
+
+    def load_client(self, event=None):
+        self.status_icon.config(text="🟡")
 
         config = load_config()
-        name = config.get("name", "")
-        client_name = config.get("client", "")
+        client_name = self.client_var.get()
+        client_data = config["clients"].get(client_name)
 
-        now = datetime.datetime.now()
+        try:
+            client = self.app.authenticate()
+            sheet = client.open_by_key(client_data["sheet_id"]).sheet1
+            _ = sheet.row_count
 
-        row = [
-            name,
-            "Clocked In",
-            now.strftime("%Y-%m-%d"),
-            now.strftime("%H:%M:%S"),
-            "",
-            "Active"
-        ]
+            self.app.sheet = sheet
+            self.status_icon.config(text="🟢")
 
-        sheet.append_row(row)
-        current_row = len(sheet.get_all_values())
+        except:
+            self.app.sheet = None
+            self.status_icon.config(text="🔴")
 
-        is_clocked_in = True
-        total_active_seconds = 0
-        active_start_time = datetime.datetime.now()
+    # ---------- CLOCK IN (USES EMPTY ROW) ----------
 
-        threading.Thread(target=monitor_idle, daemon=True).start()
-        status_label.config(text="Status: Active")
-
-    def clock_out(self):
-        global is_clocked_in, total_active_seconds
-
-        if not is_clocked_in:
+    def clock_in(self):
+        if not self.app.sheet:
+            messagebox.showerror("Error", "Client not ready.")
             return
 
         now = datetime.datetime.now()
+        config = load_config()
 
-        if current_activity == "Active":
-            total_active_seconds += (now - active_start_time).seconds
+        row_index = self.app.get_first_empty_row()
 
-        h = total_active_seconds // 3600
-        m = (total_active_seconds % 3600) // 60
-        s = total_active_seconds % 60
+        self.app.sheet.update(
+            f"A{row_index}:F{row_index}",
+            [[
+                config["name"],
+                "Clocked In",
+                now.strftime("%Y-%m-%d"),
+                now.strftime("%H:%M:%S"),
+                "",
+                "Active"
+            ]]
+        )
 
-        sheet.update(f"B{current_row}", "Clocked Out")
-        sheet.update(f"D{current_row}", now.strftime("%H:%M:%S"))
-        sheet.update(f"E{current_row}", f"{h:02}:{m:02}:{s:02}")
-        sheet.update(f"F{current_row}", "Inactive")
+        self.app.current_row = row_index
+        self.app.is_clocked_in = True
+        self.app.active_start = now
+        self.app.total_active = 0
 
-        is_clocked_in = False
-        status_label.config(text="Status: Clocked Out")
+        threading.Thread(target=self.app.monitor_idle, daemon=True).start()
+
+        self.client_dropdown.config(state="disabled")
+
+        self.clock_in_btn.pack_forget()
+        self.clock_out_btn.pack(pady=10)
+
+        self.status_label.config(text="Clocked In")
+        self.timestamp_label.config(
+            text=f"Clocked in at {now.strftime('%I:%M %p')}"
+        )
+
+        self.update_timer()
+
+    # ---------- CLOCK OUT (WRITES TO NEXT ROW) ----------
+
+    def clock_out(self):
+        now = datetime.datetime.now()
+        self.app.total_active += (now - self.app.active_start).seconds
+
+        h = self.app.total_active // 3600
+        m = (self.app.total_active % 3600) // 60
+        s = self.app.total_active % 60
+
+        next_row = self.app.current_row + 1
+
+        self.app.sheet.update(
+            f"A{next_row}:F{next_row}",
+            [[
+                load_config()["name"],
+                "Clocked Out",
+                now.strftime("%Y-%m-%d"),
+                now.strftime("%H:%M:%S"),
+                f"{h:02}:{m:02}:{s:02}",
+                "Inactive"
+            ]]
+        )
+
+        self.client_dropdown.config(state="readonly")
+
+        self.clock_out_btn.pack_forget()
+        self.clock_in_btn.pack(pady=10)
+
+        self.status_label.config(text="Clocked Out")
+        self.timestamp_label.config(
+            text=f"Clocked out at {now.strftime('%I:%M %p')}"
+        )
+
+        self.total_label.config(text=f"{h:02}:{m:02}:{s:02}")
+
+        self.app.is_clocked_in = False
+
+    def update_timer(self):
+        if not self.app.is_clocked_in:
+            return
+
+        now = datetime.datetime.now()
+        elapsed = self.app.total_active
+
+        if self.app.current_activity == "Active":
+            elapsed += (now - self.app.active_start).seconds
+
+        h = elapsed // 3600
+        m = (elapsed % 3600) // 60
+        s = elapsed % 60
+
+        self.total_label.config(text=f"{h:02}:{m:02}:{s:02}")
+        self.after(1000, self.update_timer)
+
 
 # ================= RUN =================
 
-app = App()
+app = TimeTrackerApp()
 app.mainloop()
