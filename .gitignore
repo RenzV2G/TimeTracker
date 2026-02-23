@@ -12,7 +12,9 @@ build/
 develop-eggs/
 dist/
 downloads/
-credentials.json
+client_secret.json
+config.json
+token.json
 eggs/
 .eggs/
 lib/

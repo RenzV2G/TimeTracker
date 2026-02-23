@@ -3,57 +3,72 @@ from tkinter import messagebox
 import datetime
 import threading
 import time
+import json
 import re
+import os
+
 from pynput import mouse
 import gspread
-from google.oauth2.service_account import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
 
-# ================= GLOBALS =================
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive.file"
+]
+
+IDLE_THRESHOLD = 360
+
+# GLOBALS
 sheet = None
-spreadsheet = None
+creds = None
 last_activity = datetime.datetime.now()
 is_clocked_in = False
 current_row = None
-current_activity = None
-clock_in_time = None
+current_activity = "Active"
+active_start_time = None
+total_active_seconds = 0
 
-IDLE_THRESHOLD = 360  # 6 minutes
+# ================= OAUTH =================
 
-# ================= GOOGLE AUTH =================
+def authenticate():
+    global creds
 
-scope = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
+    if os.path.exists("token.json"):
+        creds = Credentials.from_authorized_user_file("token.json", SCOPES)
 
-creds = Credentials.from_service_account_file(
-    "credentials.json", scopes=scope
-)
-client = gspread.authorize(creds)
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                "client_secret.json", SCOPES
+            )
+            creds = flow.run_local_server(port=0)
 
-# ================= SHEET FUNCTIONS =================
+        with open("token.json", "w") as token:
+            token.write(creds.to_json())
+
+    return gspread.authorize(creds)
+
+# ================= UTIL =================
 
 def extract_sheet_id(url):
     match = re.search(r"/d/([a-zA-Z0-9-_]+)", url)
     return match.group(1) if match else None
 
-def test_connection():
-    global sheet, spreadsheet
-    url = sheet_entry.get().strip()
-    sheet_id = extract_sheet_id(url)
+def save_config(data):
+    with open("config.json", "w") as f:
+        json.dump(data, f)
 
-    if not sheet_id:
-        messagebox.showerror("Error", "Invalid Google Sheets link.")
-        return
+def load_config():
+    if os.path.exists("config.json"):
+        with open("config.json", "r") as f:
+            return json.load(f)
+    return {}
 
-    try:
-        spreadsheet = client.open_by_key(sheet_id)
-        sheet = spreadsheet.sheet1
-        messagebox.showinfo("Success", "Google Sheet connected successfully.")
-    except Exception as e:
-        messagebox.showerror("Error", f"Connection failed:\n{e}")
-
-# ================= MOUSE TRACKING =================
+# ================= IDLE MONITOR =================
 
 def on_move(x, y):
     global last_activity
@@ -61,100 +76,202 @@ def on_move(x, y):
 
 mouse.Listener(on_move=on_move).start()
 
-# ================= IDLE MONITOR =================
-
 def monitor_idle():
-    global current_activity
+    global current_activity, total_active_seconds, active_start_time
 
     while is_clocked_in:
-        idle_seconds = (datetime.datetime.now() - last_activity).seconds
+        idle_time = (datetime.datetime.now() - last_activity).seconds
 
-        if idle_seconds >= IDLE_THRESHOLD:
-            if current_activity != "Idle":
+        if idle_time >= IDLE_THRESHOLD:
+            if current_activity == "Active":
+                total_active_seconds += (
+                    datetime.datetime.now() - active_start_time
+                ).seconds
                 sheet.update(f"F{current_row}", "Idle")
                 current_activity = "Idle"
+                status_label.config(text="Status: Idle")
         else:
-            if current_activity != "Active":
+            if current_activity == "Idle":
+                active_start_time = datetime.datetime.now()
                 sheet.update(f"F{current_row}", "Active")
                 current_activity = "Active"
+                status_label.config(text="Status: Active")
 
         time.sleep(5)
 
-# ================= CLOCK LOGIC =================
+# ================= APP =================
 
-def clock_in():
-    global is_clocked_in, current_row, clock_in_time, current_activity
+class App(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Freelance Time Tracker")
+        self.geometry("400x300")
 
-    if not sheet:
-        messagebox.showerror("Error", "Connect Google Sheet first.")
-        return
+        container = tk.Frame(self)
+        container.pack(fill="both", expand=True)
 
-    name = name_entry.get().strip()
-    if not name:
-        messagebox.showerror("Error", "Enter your name.")
-        return
+        self.frames = {}
 
-    now = datetime.datetime.now()
-    clock_in_time = now
-    is_clocked_in = True
-    current_activity = "Active"
+        for F in (SignInFrame, SheetFrame, UserFrame, DashboardFrame):
+            frame = F(container, self)
+            self.frames[F] = frame
+            frame.grid(row=0, column=0, sticky="nsew")
 
-    row = [
-        name,
-        "Clocked In",
-        now.strftime("%Y-%m-%d"),
-        now.strftime("%H:%M:%S"),
-        "",
-        "Active"
-    ]
+        self.show_frame(SignInFrame)
 
-    sheet.append_row(row)
-    current_row = len(sheet.get_all_values())
+    def show_frame(self, cont):
+        frame = self.frames[cont]
+        frame.tkraise()
 
-    status_label.config(text="Status: Active")
+# ================= STEP 1 =================
 
-    threading.Thread(target=monitor_idle, daemon=True).start()
+class SignInFrame(tk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
 
-def clock_out():
-    global is_clocked_in
+        tk.Label(self, text="Step 1: Sign in to Google", font=("Arial", 14)).pack(pady=20)
 
-    if not is_clocked_in:
-        return
+        tk.Button(self, text="Sign In with Google", width=25,
+                  command=lambda: self.signin(controller)).pack()
 
-    now = datetime.datetime.now()
-    is_clocked_in = False
+    def signin(self, controller):
+        try:
+            authenticate()
+            messagebox.showinfo("Success", "Signed in successfully!")
+            controller.show_frame(SheetFrame)
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
 
-    duration = now - clock_in_time
-    total_time = str(duration).split(".")[0]
+# ================= STEP 2 =================
 
-    sheet.update(f"B{current_row}", "Clocked Out")
-    sheet.update(f"D{current_row}", now.strftime("%H:%M:%S"))
-    sheet.update(f"E{current_row}", total_time)
-    sheet.update(f"F{current_row}", "Inactive")
+class SheetFrame(tk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
 
-    status_label.config(text="Status: Clocked Out")
+        tk.Label(self, text="Step 2: Connect Sheet", font=("Arial", 14)).pack(pady=10)
 
-# ================= GUI =================
+        self.sheet_entry = tk.Entry(self, width=40)
+        self.sheet_entry.pack(pady=5)
+        self.sheet_entry.insert(0, "Paste Google Sheet Link")
 
-root = tk.Tk()
-root.title("Simple Team Time Tracker")
-root.geometry("400x300")
-root.resizable(False, False)
+        self.client_entry = tk.Entry(self, width=40)
+        self.client_entry.pack(pady=5)
+        self.client_entry.insert(0, "Client Name")
 
-tk.Label(root, text="Google Sheets Link").pack(pady=5)
-sheet_entry = tk.Entry(root, width=50)
-sheet_entry.pack()
+        tk.Button(self, text="Connect",
+                  command=lambda: self.connect(controller)).pack(pady=10)
 
-tk.Button(root, text="Test Connection", command=test_connection).pack(pady=5)
+    def connect(self, controller):
+        global sheet
 
-tk.Label(root, text="Enter Name").pack(pady=5)
-name_entry = tk.Entry(root)
-name_entry.pack()
+        try:
+            client = authenticate()
+            sheet_id = extract_sheet_id(self.sheet_entry.get())
+            sheet = client.open_by_key(sheet_id).sheet1
 
-tk.Button(root, text="Clock In", command=clock_in).pack(pady=10)
-tk.Button(root, text="Clock Out", command=clock_out).pack(pady=5)
+            config = load_config()
+            config["client"] = self.client_entry.get()
+            config["sheet_url"] = self.sheet_entry.get()
+            save_config(config)
 
-status_label = tk.Label(root, text="Status: Not Clocked In")
-status_label.pack(pady=20)
+            messagebox.showinfo("Success", "Sheet Connected!")
+            controller.show_frame(UserFrame)
 
-root.mainloop()
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+# ================= STEP 3 =================
+
+class UserFrame(tk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+
+        tk.Label(self, text="Step 3: Your Name", font=("Arial", 14)).pack(pady=20)
+
+        self.name_entry = tk.Entry(self, width=30)
+        self.name_entry.pack()
+
+        config = load_config()
+        if "name" in config:
+            self.name_entry.insert(0, config["name"])
+
+        tk.Button(self, text="Continue",
+                  command=lambda: self.save_and_continue(controller)).pack(pady=15)
+
+    def save_and_continue(self, controller):
+        config = load_config()
+        config["name"] = self.name_entry.get()
+        save_config(config)
+        controller.show_frame(DashboardFrame)
+
+# ================= DASHBOARD =================
+
+class DashboardFrame(tk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+
+        tk.Label(self, text="Dashboard", font=("Arial", 14)).pack(pady=10)
+
+        tk.Button(self, text="Clock In", command=self.clock_in).pack(pady=5)
+        tk.Button(self, text="Clock Out", command=self.clock_out).pack(pady=5)
+
+        global status_label
+        status_label = tk.Label(self, text="Status: Not Clocked In")
+        status_label.pack(pady=10)
+
+    def clock_in(self):
+        global is_clocked_in, current_row
+        global active_start_time, total_active_seconds
+
+        config = load_config()
+        name = config.get("name", "")
+        client_name = config.get("client", "")
+
+        now = datetime.datetime.now()
+
+        row = [
+            name,
+            "Clocked In",
+            now.strftime("%Y-%m-%d"),
+            now.strftime("%H:%M:%S"),
+            "",
+            "Active"
+        ]
+
+        sheet.append_row(row)
+        current_row = len(sheet.get_all_values())
+
+        is_clocked_in = True
+        total_active_seconds = 0
+        active_start_time = datetime.datetime.now()
+
+        threading.Thread(target=monitor_idle, daemon=True).start()
+        status_label.config(text="Status: Active")
+
+    def clock_out(self):
+        global is_clocked_in, total_active_seconds
+
+        if not is_clocked_in:
+            return
+
+        now = datetime.datetime.now()
+
+        if current_activity == "Active":
+            total_active_seconds += (now - active_start_time).seconds
+
+        h = total_active_seconds // 3600
+        m = (total_active_seconds % 3600) // 60
+        s = total_active_seconds % 60
+
+        sheet.update(f"B{current_row}", "Clocked Out")
+        sheet.update(f"D{current_row}", now.strftime("%H:%M:%S"))
+        sheet.update(f"E{current_row}", f"{h:02}:{m:02}:{s:02}")
+        sheet.update(f"F{current_row}", "Inactive")
+
+        is_clocked_in = False
+        status_label.config(text="Status: Clocked Out")
+
+# ================= RUN =================
+
+app = App()
+app.mainloop()
