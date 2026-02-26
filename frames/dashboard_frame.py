@@ -1,4 +1,3 @@
-# frames/dashboard_frame.py
 import tkinter as tk
 from tkinter import ttk, messagebox
 import datetime
@@ -8,36 +7,29 @@ from config import load_config
 from utils import get_current_timestamp, format_time
 from constants import ICON_GREEN, ICON_YELLOW, ICON_RED, ICON_GRAY, IDLE_THRESHOLD
 
-# Remove direct imports of other frames
-# We'll use string references or import inside methods
-
 class DashboardFrame(ttk.Frame):
     def __init__(self, parent, app):
         super().__init__(parent)
         self.app = app
-        self.state = None  # Will be initialized in refresh
+        self.state = None  
         
         self.setup_ui()
     
     def setup_ui(self):
-        """Setup the dashboard UI."""
         self.setup_header()
         self.setup_client_section()
         self.setup_status_section()
         self.setup_buttons()
     
     def setup_header(self):
-        """Setup the header section."""
         header = ttk.Frame(self)
         header.pack(fill="x")
         
         ttk.Label(header, text="Dashboard", style="Header.TLabel").pack(side="left")
         
-        # Settings menu
         settings_btn = ttk.Menubutton(header, text="⚙")
         menu = tk.Menu(settings_btn, tearoff=0)
         
-        # Use lambda with app.show_frame and class name as string
         menu.add_command(label="Edit Name", 
                         command=lambda: self.app.show_frame_by_name("NameFrame"))
         menu.add_command(label="Sign Out", command=self.app.sign_out)
@@ -50,7 +42,6 @@ class DashboardFrame(ttk.Frame):
         self.greeting.pack(pady=5)
     
     def setup_client_section(self):
-        """Setup the client selection section."""
         row = ttk.Frame(self)
         row.pack()
         
@@ -69,7 +60,6 @@ class DashboardFrame(ttk.Frame):
         self.status_icon.pack(side="left", padx=5)
     
     def setup_status_section(self):
-        """Setup the status display section."""
         self.status_label = ttk.Label(self, text="Not Clocked In")
         self.status_label.pack()
         
@@ -81,8 +71,6 @@ class DashboardFrame(ttk.Frame):
         self.total_label.pack(pady=15)
     
     def setup_buttons(self):
-        """Setup action buttons."""
-        # Use string reference instead of direct import
         ttk.Button(self,
                    text="Sheets",
                    command=lambda: self.app.show_frame_by_name("SheetFrame"),
@@ -102,8 +90,6 @@ class DashboardFrame(ttk.Frame):
         self.clock_in_btn.pack(pady=10)
     
     def refresh(self):
-        """Refresh the dashboard data."""
-        # Import here to avoid circular imports
         from models import TimeTrackerState
         
         config = load_config()
@@ -112,12 +98,10 @@ class DashboardFrame(ttk.Frame):
         clients = list(config.get("clients", {}).keys())
         self.client_dropdown["values"] = clients
         
-        # Reset state
         self.state = TimeTrackerState()
         self.update_button_state()
     
     def load_client(self, event=None):
-        """Load the selected client's sheet."""
         self.status_icon.config(text=ICON_YELLOW)
         
         config = load_config()
@@ -142,7 +126,6 @@ class DashboardFrame(ttk.Frame):
             self.status_icon.config(text=ICON_RED)
     
     def get_first_empty_row(self):
-        """Get the first empty row in the sheet."""
         data = self.app.sheet.get_all_values()
         
         for i, row in enumerate(data, start=1):
@@ -152,7 +135,6 @@ class DashboardFrame(ttk.Frame):
         return len(data) + 1
     
     def clock_in(self):
-        """Clock in to the current client."""
         if not self.app.sheet:
             messagebox.showerror("Error", "Client not ready.")
             return
@@ -161,7 +143,6 @@ class DashboardFrame(ttk.Frame):
         config = load_config()
         row_index = self.get_first_empty_row()
         
-        # Write to sheet
         self.app.sheet.update(
             f"A{row_index}:F{row_index}",
             [[
@@ -174,7 +155,6 @@ class DashboardFrame(ttk.Frame):
             ]]
         )
         
-        # Update state
         if self.state:
             self.state.clock_in(row_index, timestamp['datetime'])
         
@@ -185,10 +165,8 @@ class DashboardFrame(ttk.Frame):
         self.app.last_activity = timestamp['datetime']
         self.app.current_activity = "Active"
         
-        # Start monitoring
         threading.Thread(target=self.monitor_idle, daemon=True).start()
         
-        # Update UI
         self.client_dropdown.config(state="disabled")
         self.update_button_state()
         self.status_label.config(text="Clocked In")
@@ -197,20 +175,17 @@ class DashboardFrame(ttk.Frame):
         self.update_timer()
     
     def clock_out(self):
-        """Clock out from the current client."""
         timestamp = get_current_timestamp()
         
         if self.state:
             self.state.clock_out(timestamp['datetime'])
             total_formatted = format_time(self.state.get_total_seconds(timestamp['datetime']))
         else:
-            # Fallback if state is not available
             self.app.total_active += (timestamp['datetime'] - self.app.active_start).seconds
             total_formatted = format_time(self.app.total_active)
         
         next_row = self.app.current_row + 1
         
-        # Write to sheet
         self.app.sheet.update(
             f"A{next_row}:F{next_row}",
             [[
@@ -223,7 +198,6 @@ class DashboardFrame(ttk.Frame):
             ]]
         )
         
-        # Update UI
         self.client_dropdown.config(state="readonly")
         self.update_button_state()
         self.status_label.config(text="Clocked Out")
@@ -233,7 +207,6 @@ class DashboardFrame(ttk.Frame):
         self.app.is_clocked_in = False
     
     def update_button_state(self):
-        """Update button visibility based on clock state."""
         if self.state and self.state.is_clocked_in:
             self.clock_in_btn.pack_forget()
             self.clock_out_btn.pack(pady=10)
@@ -245,7 +218,6 @@ class DashboardFrame(ttk.Frame):
             self.clock_in_btn.pack(pady=10)
     
     def update_timer(self):
-        """Update the timer display."""
         if not (self.state and self.state.is_clocked_in) and not self.app.is_clocked_in:
             return
         
@@ -254,7 +226,6 @@ class DashboardFrame(ttk.Frame):
         if self.state:
             total_formatted = format_time(self.state.get_total_seconds(now))
         else:
-            # Fallback calculation
             elapsed = self.app.total_active
             if self.app.current_activity == "Active":
                 elapsed += (now - self.app.active_start).seconds
@@ -264,7 +235,6 @@ class DashboardFrame(ttk.Frame):
         self.after(1000, self.update_timer)
     
     def monitor_idle(self):
-        """Monitor user idle time."""
         while self.app.is_clocked_in:
             idle_time = (datetime.datetime.now() - self.app.last_activity).seconds
             

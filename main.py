@@ -1,4 +1,3 @@
-# main.py
 import tkinter as tk
 from tkinter import ttk
 import datetime
@@ -9,7 +8,6 @@ from auth import GoogleAuth
 from config import load_config, save_config
 from constants import BG_COLOR, IDLE_THRESHOLD
 from frames import SignInFrame, NameFrame, SheetFrame, DashboardFrame
-
 
 class TimeTrackerApp(tk.Tk):
     def __init__(self):
@@ -35,26 +33,23 @@ class TimeTrackerApp(tk.Tk):
         self.last_activity = datetime.datetime.now()
         self.current_activity = "Active"
         
-        # Setup frames
         container = ttk.Frame(self)
         container.pack(fill="both", expand=True, padx=30, pady=20)
         
         self.frames = {}
-        self.frames_by_name = {}  # Dictionary to access frames by name
+        self.frames_by_name = {}  
         
         for F in (SignInFrame, NameFrame, SheetFrame, DashboardFrame):
             frame = F(container, self)
             self.frames[F] = frame
-            self.frames_by_name[F.__name__] = frame  # Store by class name
+            self.frames_by_name[F.__name__] = frame  
             frame.grid(row=0, column=0, sticky="nsew")
         
         self.auto_navigate()
         
-        # Start mouse listener
         mouse.Listener(on_move=self.on_move).start()
     
     def show_frame_by_name(self, frame_name):
-        """Show frame by class name string."""
         if frame_name in self.frames_by_name:
             frame = self.frames_by_name[frame_name]
             frame.tkraise()
@@ -62,7 +57,6 @@ class TimeTrackerApp(tk.Tk):
                 frame.refresh()
     
     def setup_styles(self):
-        """Setup ttk styles."""
         self.style = ttk.Style(self)
         self.style.theme_use("clam")
         
@@ -81,17 +75,14 @@ class TimeTrackerApp(tk.Tk):
                             font=("Segoe UI", 10, "bold"))
     
     def authenticate(self):
-        """Authenticate with Google."""
         return self.auth.authenticate()
     
     def sign_out(self):
-        """Sign out the current user."""
         self.auth.sign_out()
         self.config_data = load_config()
         self.auto_navigate()
     
     def auto_navigate(self):
-        """Navigate to the appropriate frame."""
         if not self.auth.is_logged_in():
             self.show_frame(SignInFrame)
         elif not self.config_data.get("name"):
@@ -100,14 +91,12 @@ class TimeTrackerApp(tk.Tk):
             self.show_frame(DashboardFrame)
     
     def show_frame(self, frame_class):
-        """Show the specified frame (backward compatibility)."""
         frame = self.frames[frame_class]
         frame.tkraise()
         if hasattr(frame, "refresh"):
             frame.refresh()
     
     def on_move(self, x, y):
-        """Handle mouse movement for idle detection."""
         self.last_activity = datetime.datetime.now()
 
 

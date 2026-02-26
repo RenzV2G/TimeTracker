@@ -1,10 +1,7 @@
-# frames/sheet_frame.py
 import tkinter as tk
 from tkinter import ttk, messagebox
 from config import load_config, save_config
 from utils import extract_sheet_id
-
-# Remove direct import of DashboardFrame
 
 class SheetFrame(ttk.Frame):
     def __init__(self, parent, app):
@@ -14,7 +11,6 @@ class SheetFrame(ttk.Frame):
         self.setup_ui()
     
     def setup_ui(self):
-        """Setup the UI components."""
         ttk.Label(self,
                   text="Manage Client Sheets",
                   style="Header.TLabel").pack(pady=15)
@@ -23,7 +19,6 @@ class SheetFrame(ttk.Frame):
         self.setup_buttons()
     
     def setup_table(self):
-        """Setup the treeview table."""
         table_frame = ttk.Frame(self)
         table_frame.pack(pady=10)
         
@@ -42,7 +37,6 @@ class SheetFrame(ttk.Frame):
         self.tree.pack()
     
     def setup_buttons(self):
-        """Setup action buttons."""
         action_frame = ttk.Frame(self)
         action_frame.pack(pady=10)
         
@@ -67,14 +61,12 @@ class SheetFrame(ttk.Frame):
                    command=self.add_popup,
                    style="Primary.TButton").pack(pady=5)
         
-        # Use string reference instead of direct import
         ttk.Button(self,
                    text="Back to Dashboard",
                    command=lambda: self.app.show_frame_by_name("DashboardFrame"),
                    style="Primary.TButton").pack(pady=5)
     
     def refresh(self):
-        """Refresh the table data."""
         self.tree.delete(*self.tree.get_children())
         
         config = load_config()
@@ -82,7 +74,6 @@ class SheetFrame(ttk.Frame):
             self.tree.insert("", "end", values=(name, data["sheet_id"]))
     
     def get_selected_client(self):
-        """Get the selected client name."""
         selected = self.tree.selection()
         if not selected:
             messagebox.showwarning("Select Client", "Please select a client.")
@@ -90,13 +81,11 @@ class SheetFrame(ttk.Frame):
         return self.tree.item(selected[0])["values"][0]
     
     def edit_selected(self):
-        """Edit the selected client."""
         client = self.get_selected_client()
         if client:
             self.edit_popup(client)
     
     def delete_selected(self):
-        """Delete the selected client."""
         client = self.get_selected_client()
         if not client:
             return
@@ -109,27 +98,22 @@ class SheetFrame(ttk.Frame):
             self.refresh()
     
     def add_popup(self):
-        """Show popup to add new client."""
         self.edit_popup()
     
     def edit_popup(self, client_name=None):
-        """Show popup to edit client."""
         popup = tk.Toplevel(self)
         popup.title("Client Setup")
         popup.geometry("400x250")
         popup.configure(bg="#f4f6f9")
         
-        # Name field
         ttk.Label(popup, text="Client Name").pack(pady=5)
         name_entry = ttk.Entry(popup, width=40)
         name_entry.pack()
         
-        # URL field
         ttk.Label(popup, text="Google Sheet URL").pack(pady=5)
         url_entry = ttk.Entry(popup, width=40)
         url_entry.pack()
         
-        # Populate if editing
         if client_name:
             config = load_config()
             data = config["clients"][client_name]
@@ -142,12 +126,10 @@ class SheetFrame(ttk.Frame):
                 if not sheet_id:
                     raise Exception("Invalid Google Sheets URL.")
                 
-                # Test connection
                 client = self.app.authenticate()
                 sheet = client.open_by_key(sheet_id).sheet1
                 _ = sheet.row_count
                 
-                # Save to config
                 config = load_config()
                 config["clients"][name_entry.get()] = {
                     "sheet_url": url_entry.get(),

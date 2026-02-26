@@ -4,7 +4,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive.file"
 ]
 
-IDLE_THRESHOLD = 360
+IDLE_THRESHOLD = 3
 
 # Colors and styles
 BG_COLOR = "#f4f6f9"
