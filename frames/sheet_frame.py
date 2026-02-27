@@ -42,7 +42,7 @@ class SheetFrame(ttk.Frame):
         
         self.edit_btn = ttk.Button(
             action_frame,
-            text="✏ Edit",
+            text="Edit",
             command=self.edit_selected,
             style="Primary.TButton"
         )
@@ -50,7 +50,7 @@ class SheetFrame(ttk.Frame):
         
         self.delete_btn = ttk.Button(
             action_frame,
-            text="🗑 Delete",
+            text="Delete",
             command=self.delete_selected,
             style="Primary.TButton"
         )
