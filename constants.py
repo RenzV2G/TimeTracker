@@ -14,6 +14,7 @@ FONT_SIZE_HEADER = 18
 FONT_SIZE_LARGE = 22
 
 # Status icons
+# Need to revise the ICON statuses
 ICON_GREEN = "🟢"
 ICON_YELLOW = "🟡"
 ICON_RED = "🔴"
