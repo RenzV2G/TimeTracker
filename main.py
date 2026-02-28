@@ -1,12 +1,11 @@
 import tkinter as tk
 from tkinter import ttk
 import datetime
-import threading
 from pynput import mouse
 
 from auth import GoogleAuth
-from config import load_config, save_config
-from constants import BG_COLOR, IDLE_THRESHOLD
+from config import load_config
+from constants import BG_COLOR
 from frames import SignInFrame, NameFrame, SheetFrame, DashboardFrame
 
 class TimeTrackerApp(tk.Tk):
@@ -14,7 +13,7 @@ class TimeTrackerApp(tk.Tk):
         super().__init__()
         
         self.title("Freelance Time Tracker")
-        self.geometry("560x520")
+        self.geometry("520x525")
         self.resizable(False, False)
         
         self.setup_styles()
@@ -65,9 +64,32 @@ class TimeTrackerApp(tk.Tk):
                             font=("Segoe UI", 10))
         self.style.configure("Header.TLabel", 
                             font=("Segoe UI", 18, "bold"))
+        
         self.style.configure("Primary.TButton",
                             font=("Segoe UI", 10, "bold"),
                             padding=6)
+        
+        self.style.configure("Delete.TButton",
+                             font=("Segoe UI", 10, "bold"),
+                             background="#D32F2F",
+                             foreground="white",
+                             padding=6 )
+        self.style.map("Delete.TButton", background=[("active", "#B71C1C")])
+        
+        self.style.configure("Edit.TButton",
+                             font=("Segoe UI", 10, "bold"),
+                             background="#1976D2",
+                             foreground="white",
+                             padding=6 )
+        self.style.map("Edit.TButton", background=[("active", "#1565C0")])
+      
+        self.style.configure("Save.TButton",
+                             font=("Segoe UI", 10, "bold"),
+                             background="#06B43A",
+                             foreground="white",
+                             padding=6 )
+        self.style.map("Save.TButton", background=[("active", "#378541")])
+        
         self.style.configure("Treeview",
                             font=("Segoe UI", 10),
                             rowheight=28)
