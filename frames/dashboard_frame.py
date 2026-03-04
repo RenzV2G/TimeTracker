@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import datetime
 import threading
+import os
+import winsound
 import time
 from config import load_config
 from utils import get_current_timestamp, format_time
@@ -9,12 +11,24 @@ from constants import IDLE_THRESHOLD
 
 
 class DashboardFrame(ttk.Frame):
+    """
+    Main dashboard UI.
+    Handles:
+    - Client selection
+    - Clock in / out
+    - Idle monitoring
+    - UI state management
+    """
     def __init__(self, parent, app):
         super().__init__(parent)
         self.app = app
         self.state = None
         self.setup_ui()
 
+        self.app.protocol("WM_DELETE_WINDOW", self.on_close)
+    
+
+    # --------- UI SETUP ----------
     def setup_ui(self):
         self.setup_header()
         self.setup_client_section()
@@ -27,28 +41,31 @@ class DashboardFrame(ttk.Frame):
 
         ttk.Label(header, text="Dashboard", style="Header.TLabel").pack(side="left")
 
-        settings_btn = ttk.Menubutton(header, text="⚙")
+        settings_btn = ttk.Menubutton(header, text="Settings")
         menu = tk.Menu(settings_btn, tearoff=0)
-
         menu.add_command(
             label="Edit Name", command=lambda: self.app.show_frame_by_name("NameFrame")
         )
         menu.add_command(label="Sign Out", command=self.app.sign_out)
+        
         settings_btn["menu"] = menu
         settings_btn.pack(side="right")
 
         ttk.Separator(self).pack(fill="x", pady=10)
 
-        self.greeting = ttk.Label(self, font=("Segoe UI", 13))
+        self.greeting = ttk.Label(self, font=("Segoe UI", 13, "bold"))
         self.greeting.pack(pady=5)
 
     def setup_client_section(self):
         row = ttk.Frame(self)
-        row.pack()
+        row.pack(pady=5)
 
-        self.client_var = tk.StringVar()
+        self.client_var = tk.StringVar(value="Please select a client")
         self.client_dropdown = ttk.Combobox(
-            row, textvariable=self.client_var, state="readonly", width=28
+            row, 
+            textvariable=self.client_var, 
+            state="readonly", 
+            width=28
         )
         self.client_dropdown.pack(side="left")
         self.client_dropdown.bind("<<ComboboxSelected>>", self.load_client)
@@ -66,8 +83,13 @@ class DashboardFrame(ttk.Frame):
             2, 2, 14, 14,
             fill="gray"
         )
-    def set_status_color(self, color):
-        self.status_canvas.itemconfig(self.status_circle, fill=color)
+
+        ttk.Button(
+            self,
+            text="Sheets",
+            command=lambda: self.app.show_frame_by_name("SheetFrame"),
+            style="Primary.TButton",
+        ).pack(pady=5)
 
     def setup_status_section(self):
         self.status_label = ttk.Label(self, text="Not Clocked In")
@@ -82,20 +104,10 @@ class DashboardFrame(ttk.Frame):
         )
         self.total_label.pack(pady=15)
 
-        self.daily_total_label = ttk.Label(
-            self, text="Today's Total: --", 
-            font=("Segoe UI", 11)
-        )
-        self.daily_total_label.pack(pady=5)
+        self.daily_total_label = ttk.Label(self)
+        self.daily_total_label.pack()
 
     def setup_buttons(self):
-        ttk.Button(
-            self,
-            text="Sheets",
-            command=lambda: self.app.show_frame_by_name("SheetFrame"),
-            style="Primary.TButton",
-        ).pack(pady=5)
-
         ttk.Separator(self).pack(fill="x", pady=10)
 
         self.clock_in_btn = ttk.Button(
@@ -109,11 +121,24 @@ class DashboardFrame(ttk.Frame):
 
 
 #  ----- Functionalities -----
+    def play_sound(self, filename):
+        try:
+            sound_path = os.path.abspath(os.path.join("sounds", filename))
+            winsound.PlaySound(sound_path, winsound.SND_FILENAME | winsound.SND_ASYNC)
+        except Exception as e:
+            print("Sound error:", e)
+
+    def set_status_color(self, color):
+        self.status_canvas.itemconfig(self.status_circle, fill=color)
+
+        if color == "green":
+            self.play_sound("ready_ping.wav")
+
     def refresh(self):
         from models import TimeTrackerState
 
         config = load_config()
-        self.greeting.config(text=f"Hello, {config.get('name','')} 👋")
+        self.greeting.config(text=f"Hello, {config.get('name','')}")
 
         clients = list(config.get("clients", {}).keys())
         self.client_dropdown["values"] = clients
@@ -122,44 +147,41 @@ class DashboardFrame(ttk.Frame):
         self.update_button_state()
 
     def load_client(self, event=None):
-        self.set_status_color("orange")
-
-        config = load_config()
         client_name = self.client_var.get()
+
+        if client_name == "Please select a client":
+            return
+        self.set_status_color("orange")
+        
+        config = load_config()
         client_data = config["clients"].get(client_name)
 
         try:
             client = self.app.authenticate()
-            sheet = client.open_by_key(client_data["sheet_id"]).sheet1
-            _ = sheet.row_count
-
-            self.app.sheet = sheet
-            if self.state:
-                self.state.sheet = sheet
+            self.app.sheet = client.open_by_key(client_data["sheet_id"]).sheet1
             self.set_status_color("green")
 
         except Exception as e:
             print(f"Error loading client: {e}")
             self.app.sheet = None
-            if self.state:
-                self.state.sheet = None
             self.set_status_color("red")
 
     def get_first_empty_row(self):
-        data = self.app.sheet.get_all_values()
+        values = self.app.sheet.get_all_values()
+        row_count = self.app.sheet.row_count
 
-        for i, row in enumerate(data, start=1):
+        # Scan existing rows
+        for index, row in enumerate(values, start=1):
             if not any(cell.strip() for cell in row):
-                return i
+                return index
 
-        return len(data) + 1
+        # No empty row found
+        next_row = len(values) + 1
 
-    def ensure_row_capacity(self, row_index):
-        current_max = self.app.sheet.row_count
+        if next_row > row_count:
+            self.app.sheet.add_rows(next_row - row_count)
 
-        if row_index > current_max:
-            rows_to_add = row_index - current_max
-            self.app.sheet.add_rows(rows_to_add)
+        return next_row
 
     def clock_in(self):
         if not self.app.sheet:
@@ -169,7 +191,6 @@ class DashboardFrame(ttk.Frame):
         timestamp = get_current_timestamp()
         config = load_config()
         row_index = self.get_first_empty_row()
-        self.ensure_row_capacity(row_index)
 
         self.app.sheet.update(
             f"A{row_index}:F{row_index}",
@@ -184,9 +205,6 @@ class DashboardFrame(ttk.Frame):
                 ]
             ],
         )
-
-        if self.state:
-            self.state.clock_in(row_index, timestamp["datetime"])
 
         self.app.is_clocked_in = True
         self.app.current_row = row_index
@@ -205,39 +223,32 @@ class DashboardFrame(ttk.Frame):
         self.update_timer()
 
     def clock_out(self):
-        self.app.is_clocked_in = False
-
         timestamp = get_current_timestamp()
 
-        if self.state:
-            self.state.clock_out(timestamp["datetime"])
-            total_formatted = format_time(
-                self.state.get_total_seconds(timestamp["datetime"])
-            )
-        else:
+        if self.app.current_activity == "Active":
             self.app.total_active += (
                 timestamp["datetime"] - self.app.active_start
             ).seconds
-            total_formatted = format_time(self.app.total_active)
 
-        next_row = self.app.current_row + 1
-        self.ensure_row_capacity(next_row)
+        total_formatted = format_time(self.app.total_active)
+
+        next_row = self.get_first_empty_row()
 
         self.app.sheet.update(
             f"A{next_row}:F{next_row}",
-            [
-                [
-                    load_config()["name"],
-                    "Clocked Out",
-                    timestamp["date"],
-                    timestamp["time"],
-                    total_formatted,
-                    "Inactive",
-                ]
-            ],
+            [[
+                load_config()["name"],
+                "Clocked Out",
+                timestamp["date"],
+                timestamp["time"],
+                total_formatted,
+                "Inactive",
+            ]]
         )
 
+        self.app.is_clocked_in = False
         self.client_dropdown.config(state="readonly")
+
         self.update_button_state()
         self.status_label.config(text="Clocked Out")
         self.timestamp_label.config(
@@ -245,11 +256,10 @@ class DashboardFrame(ttk.Frame):
         )
         self.total_label.config(text=total_formatted)
 
+        self.play_sound("clock_out.wav")
+
     def update_button_state(self):
-        if self.state and self.state.is_clocked_in:
-            self.clock_in_btn.pack_forget()
-            self.clock_out_btn.pack(pady=10)
-        elif self.app.is_clocked_in:
+        if self.app.is_clocked_in:
             self.clock_in_btn.pack_forget()
             self.clock_out_btn.pack(pady=10)
         else:
@@ -257,29 +267,21 @@ class DashboardFrame(ttk.Frame):
             self.clock_in_btn.pack(pady=10)
 
     def update_timer(self):
-        if not (self.state and self.state.is_clocked_in) and not self.app.is_clocked_in:
+        if not self.app.is_clocked_in:
             return
 
         now = datetime.datetime.now()
+        elapsed = self.app.total_active
 
-        if self.state:
-            total_formatted = format_time(self.state.get_total_seconds(now))
-        else:
-            elapsed = self.app.total_active
-            if self.app.current_activity == "Active":
-                elapsed += (now - self.app.active_start).seconds
-                total_formatted = format_time(elapsed)
+        if self.app.current_activity == "Active":
+            elapsed += (now - self.app.active_start).seconds
 
-        self.total_label.config(text=total_formatted)
-        today = datetime.datetime.now().strftime("%Y-%m-%d")
+        formatted = format_time(elapsed)
 
-        if self.state:
-            total_seconds = self.state.get_total_seconds(now)
-        else:
-            total_seconds = elapsed
-
+        self.total_label.config(text=formatted)
+        today = now.strftime("%Y-%m-%d")
         self.daily_total_label.config(
-            text=f"Your total rendered {today} - {format_time(total_seconds)}"
+            text=f"Your total rendered {today} - {formatted}"
         )
 
         self.after(1000, self.update_timer)
@@ -289,20 +291,23 @@ class DashboardFrame(ttk.Frame):
             now = datetime.datetime.now()
             idle_time = (now - self.app.last_activity).seconds
 
-            # ---- ACTIVE ➜ IDLE ----
             if idle_time >= IDLE_THRESHOLD and self.app.current_activity == "Active":
-                
-                # ✅ SAVE elapsed active time before going idle
                 self.app.total_active += (now - self.app.active_start).seconds
-                
                 self.app.current_activity = "Idle"
                 self.app.sheet.update(f"F{self.app.current_row}", [["Idle"]])
 
-            # ---- IDLE ➜ ACTIVE ----
             elif idle_time < IDLE_THRESHOLD and self.app.current_activity == "Idle":
-                
                 self.app.active_start = now
                 self.app.current_activity = "Active"
                 self.app.sheet.update(f"F{self.app.current_row}", [["Active"]])
 
             time.sleep(1)
+
+    def on_close(self):
+        if self.app.is_clocked_in:
+            messagebox.showwarning(
+                "Warning",
+                "You are currently clocked in.\nPlease clock out before exiting."
+            )
+        else:
+            self.app.destroy()
