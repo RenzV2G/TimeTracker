@@ -76,7 +76,7 @@ class SheetFrame(ttk.Frame):
     def refresh(self):
         self.tree.delete(*self.tree.get_children())
 
-        config = load_config()
+        config = self.app.config_data
         for name, data in config.get("clients", {}).items():
             self.tree.insert("", "end", values=(name, data["sheet_id"]))
 
@@ -103,9 +103,9 @@ class SheetFrame(ttk.Frame):
             icon='warning'
         )
         if confirm:
-            config = load_config()
+            config = self.app.config_data
             del config["clients"][client]
-            save_config(config)
+            save_config(self.app.auth.user_email, config)
             self.refresh()
             messagebox.showinfo("Success", f"Client '{client}' has been deleted.")
 
@@ -131,7 +131,7 @@ class SheetFrame(ttk.Frame):
         ttk.Label(popup, text=help_text, font=("Segoe UI", 8), foreground="gray").pack(pady=(0, 15))
 
         if client_name:
-            config = load_config()
+            config = self.app.config_data
             data = config["clients"][client_name]
             name_entry.insert(0, client_name)
             url_entry.insert(0, data["sheet_url"])
@@ -152,7 +152,7 @@ class SheetFrame(ttk.Frame):
                 sheet = client.open_by_key(sheet_id).sheet1
                 _ = sheet.row_count  
 
-                config = load_config()
+                config = self.app.config_data
                 clients = config.get("clients", {})
 
 
@@ -174,7 +174,7 @@ class SheetFrame(ttk.Frame):
                 if client_name and client_name != name:
                     del config["clients"][client_name]
 
-                save_config(config)
+                save_config(self.app.auth.user_email, config)
 
                 popup.destroy()
                 self.refresh()

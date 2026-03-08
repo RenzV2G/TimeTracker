@@ -5,7 +5,6 @@ import threading
 import os
 import winsound
 import time
-from config import load_config
 from utils import get_current_timestamp, format_time
 from constants import IDLE_THRESHOLD
 
@@ -43,9 +42,7 @@ class DashboardFrame(ttk.Frame):
 
         settings_btn = ttk.Menubutton(header, text="Settings")
         menu = tk.Menu(settings_btn, tearoff=0)
-        menu.add_command(
-            label="Edit Name", command=lambda: self.app.show_frame_by_name("NameFrame")
-        )
+        menu.add_command(label="Edit Name", command=lambda: self.app.show_frame_by_name("NameFrame"))
         menu.add_command(label="Sign Out", command=self.app.sign_out)
         
         settings_btn["menu"] = menu
@@ -136,12 +133,17 @@ class DashboardFrame(ttk.Frame):
 
     def refresh(self):
         from models import TimeTrackerState
+        self.set_status_color("gray")
 
-        config = load_config()
+        config = self.app.config_data
         self.greeting.config(text=f"Hello, {config.get('name','')}")
 
         clients = list(config.get("clients", {}).keys())
         self.client_dropdown["values"] = clients
+
+        self.client_var.set("Please select a client")
+        self.app.sheet = None
+        self.app.current_client = None
 
         self.state = TimeTrackerState()
         self.update_button_state()
@@ -153,18 +155,25 @@ class DashboardFrame(ttk.Frame):
             return
         self.set_status_color("orange")
         
-        config = load_config()
+        config = self.app.config_data
         client_data = config["clients"].get(client_name)
 
         try:
-            client = self.app.authenticate()
+            client = self.app.client
             self.app.sheet = client.open_by_key(client_data["sheet_id"]).sheet1
             self.set_status_color("green")
 
         except Exception as e:
-            print(f"Error loading client: {e}")
             self.app.sheet = None
             self.set_status_color("red")
+            messagebox.showerror(
+                "Sheet Access Error",
+                "Cannot access this Google Sheet.\n\n"
+                "Make sure:\n"
+                "• The sheet exists\n"
+                "• The account has permission\n"
+                "• The Sheet ID is correct"
+            )
 
     def get_first_empty_row(self):
         values = self.app.sheet.get_all_values()
@@ -189,7 +198,7 @@ class DashboardFrame(ttk.Frame):
             return
 
         timestamp = get_current_timestamp()
-        config = load_config()
+        config = self.app.config_data
         row_index = self.get_first_empty_row()
 
         self.app.sheet.update(
@@ -237,7 +246,7 @@ class DashboardFrame(ttk.Frame):
         self.app.sheet.update(
             f"A{next_row}:F{next_row}",
             [[
-                load_config()["name"],
+                self.app.config_data["name"],
                 "Clocked Out",
                 timestamp["date"],
                 timestamp["time"],
