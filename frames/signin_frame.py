@@ -11,7 +11,7 @@ class SignInFrame(ttk.Frame):
     
     def login(self):
         try:
-            self.app.authenticate()
+            self.app.client = self.app.authenticate()
             self.app.auto_navigate()
         except Exception as e:
-            messagebox.showerror("Error", str(e))
+            messagebox.showerror("Authentication", str(e))

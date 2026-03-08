@@ -13,7 +13,7 @@ develop-eggs/
 dist/
 downloads/
 client_secret.json
-config.json
+data/
 token.json
 eggs/
 .eggs/

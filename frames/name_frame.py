@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 from config import load_config, save_config
 
 class NameFrame(ttk.Frame):
@@ -16,9 +16,17 @@ class NameFrame(ttk.Frame):
     
     def refresh(self):
         self.entry.delete(0, tk.END)
-        self.entry.insert(0, load_config().get("name", ""))
+        self.entry.insert(0, self.app.config_data.get("name", ""))
     
     def save(self):
-        self.app.config_data["name"] = self.entry.get()
-        save_config(self.app.config_data)
+        name = self.entry.get().strip()
+
+        if not name:
+            messagebox.showerror("Error", "Name cannot be empty.")
+            return
+
+        self.app.config_data["name"] = name
+
+        save_config(self.app.auth.user_email, self.app.config_data)
+
         self.app.auto_navigate()

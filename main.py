@@ -1,10 +1,11 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 import datetime
 from pynput import mouse
+import os
 
 from auth import GoogleAuth
-from config import load_config
+from config import load_config, save_config, get_config_file
 from constants import BG_COLOR
 from frames import SignInFrame, NameFrame, SheetFrame, DashboardFrame
 
@@ -20,7 +21,7 @@ class TimeTrackerApp(tk.Tk):
         self.configure(bg=BG_COLOR)
         
         self.auth = GoogleAuth()
-        self.config_data = load_config()
+        self.config_data = {}
         
         # State variables
         self.sheet = None
@@ -100,14 +101,60 @@ class TimeTrackerApp(tk.Tk):
         return self.auth.authenticate()
     
     def sign_out(self):
+        if self.is_clocked_in:
+            messagebox.showwarning(
+                "Clock In Active",
+                "You must clock out before signing out."
+            )
+            return
+
+        answer = messagebox.askyesnocancel(
+            "Sign Out",
+            "Do you want to save your configuration before signing out?"
+        )
+
+        if answer is None:
+            return
+    
+        if answer:
+            save_config(self.auth.user_email, self.config_data)
+        else:
+            config_path = get_config_file(self.auth.user_email)
+            if os.path.exists(config_path):
+                os.remove(config_path)
+
+        self.sheet = None
+        self.current_client = None
+        self.is_clocked_in = False
+        self.current_activity = None
+
         self.auth.sign_out()
-        self.config_data = load_config()
-        self.auto_navigate()
+
+        self.client = None
+        self.config_data = {}
+
+        self.show_frame(SignInFrame)
     
     def auto_navigate(self):
         if not self.auth.is_logged_in():
             self.show_frame(SignInFrame)
-        elif not self.config_data.get("name"):
+            return
+        
+        try:
+            self.client = self.auth.authenticate()
+            email = self.auth.user_email
+            self.config_data = load_config(email)
+
+        except Exception:
+            messagebox.showwarning(
+                "Session Expired",
+                "Your login session expired. Please sign in again"
+            )
+            self.auth.sign_out()
+            self.show_frame(SignInFrame)
+            return
+        
+        if not self.config_data.get("name"):
             self.show_frame(NameFrame)
         else:
             self.show_frame(DashboardFrame)

@@ -1,21 +1,11 @@
 # constants.py
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive.file"
+    "https://www.googleapis.com/auth/userinfo.email",
+    "openid"
 ]
 
-IDLE_THRESHOLD = 3
+IDLE_THRESHOLD = 3 #change this upon deploying
 
 # Colors and styles
 BG_COLOR = "#f4f6f9"
-FONT_FAMILY = "Segoe UI"
-FONT_SIZE_NORMAL = 10
-FONT_SIZE_HEADER = 18
-FONT_SIZE_LARGE = 22
-
-# Status icons
-# Need to revise the ICON statuses
-ICON_GREEN = "🟢"
-ICON_YELLOW = "🟡"
-ICON_RED = "🔴"
-ICON_GRAY = "⚪"
