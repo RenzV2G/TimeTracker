@@ -1,9 +1,10 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-from config import load_config, save_config
+from config import save_config
 from utils import extract_sheet_id
 
 class SheetFrame(ttk.Frame):
+    # UI setup of the sheet frame
     def __init__(self, parent, app):
         super().__init__(parent)
         self.app = app
@@ -73,25 +74,26 @@ class SheetFrame(ttk.Frame):
                    command=lambda: self.app.show_frame_by_name("DashboardFrame"),
                    style="Primary.TButton").pack(pady=5)
 
+    # Core functionalities of the sheets frame
     def refresh(self):
         self.tree.delete(*self.tree.get_children())
 
         config = self.app.config_data
         for name, data in config.get("clients", {}).items():
             self.tree.insert("", "end", values=(name, data["sheet_id"]))
-
+    # Detect if user is currently selected an client to edit nor delete
     def get_selected_client(self):
         selected = self.tree.selection()
         if not selected:
             messagebox.showwarning("Select Client", "Please select a client.")
             return None
         return self.tree.item(selected[0])["values"][0]
-
+    # To Edit the selected client function
     def edit_selected(self):
         client = self.get_selected_client()
         if client:
             self.edit_popup(client)
-
+    # To Delete the selected client function
     def delete_selected(self):
         client = self.get_selected_client()
         if not client:
@@ -109,10 +111,11 @@ class SheetFrame(ttk.Frame):
             self.refresh()
             messagebox.showinfo("Success", f"Client '{client}' has been deleted.")
 
-    # Saving button with duplication checker
+    # The popup function to show the edit pop up
     def add_popup(self):
         self.edit_popup()
 
+    # The edit pop up window where it pops when the user adds or edit the sheets/client url
     def edit_popup(self, client_name=None):
         popup = tk.Toplevel(self)
         popup.title("Client Setup")
@@ -187,7 +190,6 @@ class SheetFrame(ttk.Frame):
         ttk.Button(popup, text="Save", command=save, style="Save.TButton").pack(
             pady=15
         )
-# -------------------------
 
 
 

@@ -5,7 +5,7 @@ import threading
 import os
 import winsound
 import time
-from utils import get_current_timestamp, format_time
+from utils import get_current_timestamp, format_time, resource_path
 from constants import IDLE_THRESHOLD
 
 
@@ -118,9 +118,10 @@ class DashboardFrame(ttk.Frame):
 
 
 #  ----- Functionalities -----
+    # Clock in and sheets ready SFX
     def play_sound(self, filename):
         try:
-            sound_path = os.path.abspath(os.path.join("sounds", filename))
+            sound_path = resource_path(f"sounds/{filename}")
             winsound.PlaySound(sound_path, winsound.SND_FILENAME | winsound.SND_ASYNC)
         except Exception as e:
             print("Sound error:", e)
@@ -131,6 +132,7 @@ class DashboardFrame(ttk.Frame):
         if color == "green":
             self.play_sound("ready_ping.wav")
 
+    # The dropdown menu checks validates or run a test check if the clientURL is working
     def refresh(self):
         from models import TimeTrackerState
         self.set_status_color("gray")
@@ -175,6 +177,7 @@ class DashboardFrame(ttk.Frame):
                 "• The Sheet ID is correct"
             )
 
+    # To get the first empty row for the system to input the clockin or clockout to the sheets
     def get_first_empty_row(self):
         values = self.app.sheet.get_all_values()
         row_count = self.app.sheet.row_count
@@ -267,6 +270,7 @@ class DashboardFrame(ttk.Frame):
 
         self.play_sound("clock_out.wav")
 
+    # To hide the clockin button if the user is already in clockedin, and show the clock out button. and vice versa
     def update_button_state(self):
         if self.app.is_clocked_in:
             self.clock_in_btn.pack_forget()
@@ -275,6 +279,7 @@ class DashboardFrame(ttk.Frame):
             self.clock_out_btn.pack_forget()
             self.clock_in_btn.pack(pady=10)
 
+    # Status update of the clock
     def update_timer(self):
         if not self.app.is_clocked_in:
             return
@@ -295,6 +300,7 @@ class DashboardFrame(ttk.Frame):
 
         self.after(1000, self.update_timer)
 
+    # The mouse idle monitoring detection
     def monitor_idle(self):
         while self.app.is_clocked_in:
             now = datetime.datetime.now()
@@ -310,8 +316,9 @@ class DashboardFrame(ttk.Frame):
                 self.app.current_activity = "Active"
                 self.app.sheet.update(f"F{self.app.current_row}", [["Active"]])
 
-            time.sleep(1)
+            time.sleep(2)
 
+    # App accidental close detection
     def on_close(self):
         if self.app.is_clocked_in:
             messagebox.showwarning(

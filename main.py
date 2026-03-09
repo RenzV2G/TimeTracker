@@ -9,7 +9,9 @@ from config import load_config, save_config, get_config_file
 from constants import BG_COLOR
 from frames import SignInFrame, NameFrame, SheetFrame, DashboardFrame
 
+# Core Function of the application contains the UI/UX, global buttons style, and the authentication.
 class TimeTrackerApp(tk.Tk):
+    # UI/UX of the main frame
     def __init__(self):
         super().__init__()
         
@@ -96,7 +98,7 @@ class TimeTrackerApp(tk.Tk):
                             rowheight=28)
         self.style.configure("Treeview.Heading",
                             font=("Segoe UI", 10, "bold"))
-    
+    # Core functionalities of the application contains here
     def authenticate(self):
         return self.auth.authenticate()
     

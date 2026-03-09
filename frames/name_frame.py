@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-from config import load_config, save_config
+from config import save_config
 
 class NameFrame(ttk.Frame):
     def __init__(self, parent, app):
