@@ -1,8 +1,11 @@
 import json
 import os
+from utils import encrypt, decrypt
 
-CONFIG_FILE = "data/configs"
+BASE_DIR = os.path.join(os.getenv("APPDATA"), "TimeTracker")
+CONFIG_FILE = os.path.join(BASE_DIR, "configs")
 
+# App folder configurations
 def get_config_file(user_email):
     os.makedirs(CONFIG_FILE, exist_ok=True)
     safe_email = user_email.replace("@", "_").replace(".", "_")
@@ -12,13 +15,19 @@ def load_config(user_email):
     path = get_config_file(user_email)
 
     if os.path.exists(path):
-        with open(path, "r") as f:
-            return json.load(f)
-        
+        with open(path, "rb") as f:
+            encrypted = f.read()
+
+        decrypted = decrypt(encrypted)        
+        return json.loads(decrypted.decode())
+    
     return {"clients": {}}
 
 def save_config(user_email, data):
     path = get_config_file(user_email)
 
-    with open(path, "w") as f:
-        json.dump(data, f, indent=4)
+    raw = json.dumps(data).encode()
+    encrypted = encrypt(raw)
+
+    with open(path, "wb") as f:
+        f.write(encrypted)

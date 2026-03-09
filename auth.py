@@ -5,13 +5,21 @@ import requests as http_requests
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
-from google.oauth2 import id_token
-from google.auth.transport import requests
+
+from utils import encrypt, decrypt, resource_path
+import json
+import uuid
 
 from constants import SCOPES
 
-TOKEN_FILE = "data/tokens"
-CLIENT_SECRET_FILE = "client_secret.json"
+# Authentication for the googleAuth, this requires more security to prevent vulnerabilities to the application.
+
+
+DEVICE_ID = hex(uuid.getnode())
+BASE_DIR = os.path.join(os.getenv("APPDATA"), "TimeTracker")
+TOKEN_FILE = os.path.join(BASE_DIR, "tokens")
+CLIENT_SECRET_FILE = resource_path("client_secret.json")
+
 
 def safe_email(email):
     return email.replace("@", "_").replace(".", "_")
@@ -50,7 +58,15 @@ class GoogleAuth:
         creds = None
         
         if self.token_file and os.path.exists(self.token_file):
-            creds = Credentials.from_authorized_user_file(self.token_file, SCOPES)
+            with open(self.token_file, "rb") as f:
+                encrypted = f.read()
+            
+            decrypted = decrypt(encrypted).decode()
+            data = json.loads(decrypted)
+
+            if data.get("device_id") != DEVICE_ID:
+                raise Exception("Token belongs to another device.")
+            creds = Credentials.from_authorized_user_info(data, SCOPES)
 
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
@@ -81,8 +97,13 @@ class GoogleAuth:
                 self.user_email = email
                 self.token_file = self.get_token_path(self.user_email)
 
-                with open(self.token_file, "w") as token:
-                    token.write(creds.to_json())
+                data = json.loads(creds.to_json())
+                data["device_id"] = DEVICE_ID
+
+                encrypted = encrypt(json.dumps(data).encode())
+
+                with open(self.token_file, "wb") as token:
+                    token.write(encrypted)
 
         # Get Email if not set yet
         if not self.user_email:

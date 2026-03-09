@@ -1,7 +1,4 @@
-import datetime
-
 class TimeTrackerState:
-    
     def __init__(self):
         self.sheet = None
         self.current_client = None

@@ -1,11 +1,8 @@
-# constants.py
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/userinfo.email",
     "openid"
 ]
 
-IDLE_THRESHOLD = 3 #change this upon deploying
-
-# Colors and styles
-BG_COLOR = "#f4f6f9"
+IDLE_THRESHOLD = 180 #change this upon deploying - must be 180s/3min
+BG_COLOR = "#f7fddd"
