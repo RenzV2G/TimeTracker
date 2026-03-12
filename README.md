@@ -73,7 +73,7 @@ No installation required.
 * Google account authentication
 * Automatic logging to Google Sheets
 * Client-based tracking
-* Idle activity detection (3mins inactivity detection)
+* Idle activity detection (3min/s inactivity detection)
 * Real-time timer
 * Simple desktop UI (Python TKinter)
 
@@ -94,6 +94,8 @@ TimeTracker.exe
 ### 3. Sign In
 
 A browser window will open requesting Google authentication.
+DO NOTE!: The Application brand is not verified yet, you may encounter this.
+![TimeTracker - Signin](https://github.com/user-attachments/assets/b80ecc11-6b2f-4bcf-99f3-e096dfc651da)
 
 ### 4. Enter Your Name
 
