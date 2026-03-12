@@ -108,7 +108,7 @@ Paste your **Google Sheet URL**.
 Example:
 
 ```
-https://docs.google.com/spreadsheets/d/SHEET_ID_HERE/edit
+https://docs.google.com/spreadsheets/d/123456abcde/edit
 ```
 ! NOTE: if the sheet is not yours you may request the sheetURL from the owner and use that link.
 
@@ -157,7 +157,7 @@ python main.py
 
 ---
 
-## Google OAuth Setup
+## Google OAuth Setup (client_secret.json)
 
 Before running the application, you must create OAuth credentials.
 
@@ -204,8 +204,7 @@ Place it in the root directory of the project.
 To build the application:
 
 ```
-pyinstaller --onefile --windowed --add-data "client_secret.json;." --add-data "sounds;sounds" 
-main.py
+pyinstaller --onefile --windowed --clean --name TimeTracker --add-data "client_secret.json;." --add-data "sounds;sounds" --icon=timetracker.ico main.py
 ```
 
 The executable will appear in:
@@ -248,7 +247,7 @@ Contributions are welcome.
 1. Fork the repository
 2. Create a feature branch
 3. Commit changes
-4. Open a Pull Request
+4. Open a Pull Request to the Development branch
 
 All pull requests are reviewed before merging.
 
