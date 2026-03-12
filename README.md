@@ -20,9 +20,10 @@ A lightweight and simple desktop application that automatically tracks work sess
 <!-- Badges -->
 <div align="center">
 
-![Python](https://img.shields.io/badge/Python-3.10+-blue)
+![Python](https://img.shields.io/badge/Python-3.14+-blue)
 ![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey)
 ![License](https://github.com/RenzV2G/TimeTracker/blob/main/LICENSE)
+[![Stargazers][stars-shield]][[stars-url](https://github.com/RenzV2G/TimeTracker/stargazers)]
 ![Downloads](https://img.shields.io/github/downloads/RenzV2G/TimeTracker/total)
 
 </div>
@@ -95,7 +96,7 @@ TimeTracker.exe
 
 A browser window will open requesting Google authentication.
 DO NOTE!: The Application brand is not verified yet, you may encounter this.
-![TimeTracker - Signin](https://github.com/user-attachments/assets/b80ecc11-6b2f-4bcf-99f3-e096dfc651da)
+![TimeTracker - signin](https://github.com/user-attachments/assets/820896f2-7730-40be-96a3-e6b1cb1109f5)
 
 ### 4. Enter Your Name
 
@@ -103,16 +104,21 @@ The application will ask for your display name.
 
 ### 5. Connect a Google Sheet
 
-Paste your **Google Sheet URL**.
+**Template - Google Sheet TimeTracker**
+https://docs.google.com/spreadsheets/d/1m0kBAG3JPcJnCEeSIb0KvbC_pzOuar2JPM6QqbWzWxg/edit?usp=sharing
+This is on "only view" link, duplicate this sheet to use it for your own and you may add a customization and add a separate cell for computation of total hours rendered
 
-**! There's a sample Google Sheet template provided for you to duplicate and use that template**.
+![TimeTracker - sheets](https://github.com/user-attachments/assets/58918715-44fc-4b34-a941-d1cc7195834f)
+
+
+Paste your **Google Sheet URL**.
 
 Example:
 
 ```
 https://docs.google.com/spreadsheets/d/123456abcde/edit
 ```
-! NOTE: if the sheet is not yours you may request the sheetURL from the owner and use that link.
+! NOTE: if the sheet is not yours you may request the sheetURL with an editor access from the owner and use that link.
 
 ### 6. Select or Create a Client
 
@@ -127,8 +133,6 @@ Click **Clock In**.
 Click **Clock Out**.
 
 Your work session will automatically be recorded in your Google Sheet.
-
-*(GIF demonstrations will be added here)*
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
