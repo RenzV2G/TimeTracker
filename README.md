@@ -105,7 +105,9 @@ The application will ask for your display name.
 ### 5. Connect a Google Sheet
 
 **Template - Google Sheet TimeTracker**
+
 https://docs.google.com/spreadsheets/d/1m0kBAG3JPcJnCEeSIb0KvbC_pzOuar2JPM6QqbWzWxg/edit?usp=sharing
+
 This is on "only view" link, duplicate this sheet to use it for your own and you may add a customization and add a separate cell for computation of total hours rendered
 
 ![TimeTracker - sheets](https://github.com/user-attachments/assets/58918715-44fc-4b34-a941-d1cc7195834f)
