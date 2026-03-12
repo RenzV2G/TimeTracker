@@ -1,7 +1,7 @@
 <!-- Project Centered Logo -->
 <div align="center">
 
-<img src="images/logo.png" width="210"/>
+<img src="images/logo.png" width="215"/>
 
 # Freelance Time Tracker
 
