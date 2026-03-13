@@ -24,7 +24,7 @@ A lightweight and simple desktop application that automatically tracks work sess
 ![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey)
 ![License](https://github.com/RenzV2G/TimeTracker/blob/main/LICENSE)
 [![Stargazers][stars-shield]][[stars-url](https://github.com/RenzV2G/TimeTracker/stargazers)]
-![Downloads]([https://img.shields.io/github/downloads/RenzV2G/TimeTracker/total](https://github.com/RenzV2G/TimeTracker/releases/tag/v0.1.0))
+![Downloads](https://img.shields.io/github/downloads/RenzV2G/TimeTracker/total)
 
 </div>
 
