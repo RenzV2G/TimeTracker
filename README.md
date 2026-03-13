@@ -20,11 +20,11 @@ A lightweight and simple desktop application that automatically tracks work sess
 <!-- Badges -->
 <div align="center">
 
-![Python](https://img.shields.io/badge/Python-3.14+-blue)
-![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey)
+![Python](https://img.shields.io/badge/Python-3.10+-blue?style=for-the-badge)
+![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey?style=for-the-badge)
 [![License](https://img.shields.io/github/license/RenzV2G/TimeTracker?style=for-the-badge)](https://github.com/RenzV2G/TimeTracker/blob/main/LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/RenzV2G/TimeTracker)](https://github.com/RenzV2G/TimeTracker/stargazers)
-![Release Downloads](https://img.shields.io/github/downloads/RenzV2G/TimeTracker/latest/total)
+[![GitHub stars](https://img.shields.io/github/stars/RenzV2G/TimeTracker?style=for-the-badge)](https://github.com/RenzV2G/TimeTracker/stargazers)
+![Release Downloads](https://img.shields.io/github/downloads/RenzV2G/TimeTracker/latest/total?style=for-the-badge)
 
 </div>
 
