@@ -8,8 +8,8 @@
 A lightweight and simple desktop application that automatically tracks work sessions and logs them to **Google Sheets** and monitor **Idle Detection**.
 
 
-<a href="../../issues?q=is%3Aissue+label%3Abug">Report Bug</a>
-· <a href="../../issues?q=is%3Aissue+label%3Aenhancement">Request Feature</a>
+<a href="https://github.com/RenzV2G/TimeTracker/issues/new?template=bug_report.md">Report Bug</a>
+· <a href="https://github.com/RenzV2G/TimeTracker/issues/new?template=feature_request.md">Request Feature</a>
 
 </div>
 
